@@ -1,13 +1,9 @@
 package com.spring_project.digital_banking_system.controller;
 
-import com.spring_project.digital_banking_system.dto.DepositRequest;
-import com.spring_project.digital_banking_system.dto.TransferRequest;
-import com.spring_project.digital_banking_system.dto.WithdrawRequest;
 import com.spring_project.digital_banking_system.model.Transaction;
 import com.spring_project.digital_banking_system.service.AuthService;
 import com.spring_project.digital_banking_system.service.WalletService;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,7 +30,7 @@ public class WalletController {
     }
 
     @PostMapping("/deposit")
-    public ResponseEntity<Map<String, Object>> deposit(@Valid @RequestBody DepositRequest depositRequest,
+    public ResponseEntity<Map<String, Object>> deposit(@RequestBody Map<String, Object> depositRequest,
                                                        HttpServletRequest request) {
         Long userId = authService.getCurrentUserId(request);
         Map<String, Object> response = walletService.deposit(userId, depositRequest);
@@ -42,7 +38,7 @@ public class WalletController {
     }
 
     @PostMapping("/withdraw")
-    public ResponseEntity<Map<String, Object>> withdraw(@Valid @RequestBody WithdrawRequest withdrawRequest,
+    public ResponseEntity<Map<String, Object>> withdraw(@RequestBody Map<String, Object> withdrawRequest,
                                                         HttpServletRequest request) {
         Long userId = authService.getCurrentUserId(request);
         Map<String, Object> response = walletService.withdraw(userId, withdrawRequest);
@@ -50,7 +46,7 @@ public class WalletController {
     }
 
     @PostMapping("/transfer")
-    public ResponseEntity<Map<String, Object>> transfer(@Valid @RequestBody TransferRequest transferRequest,
+    public ResponseEntity<Map<String, Object>> transfer(@RequestBody Map<String, Object> transferRequest,
                                                         HttpServletRequest request) {
         Long userId = authService.getCurrentUserId(request);
         Map<String, Object> response = walletService.transfer(userId, transferRequest);

@@ -1,12 +1,9 @@
 package com.spring_project.digital_banking_system.service;
 
-import com.spring_project.digital_banking_system.dto.LoginRequest;
-import com.spring_project.digital_banking_system.dto.RegisterRequest;
 import com.spring_project.digital_banking_system.model.Role;
 import com.spring_project.digital_banking_system.model.User;
 import com.spring_project.digital_banking_system.model.Wallet;
-import com.spring_project.digital_banking_system.repository.UserRepository;
-import com.spring_project.digital_banking_system.repository.WalletRepository;
+import com.spring_project.digital_banking_system.repository.DataRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,46 +25,48 @@ import java.util.Optional;
 @Service
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final WalletRepository walletRepository;
+    private final DataRepository dataRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.admin.master-key:BANK_ADMIN_2025}")
     private String masterSecretKey;
 
-    public AuthService(UserRepository userRepository,
-                       WalletRepository walletRepository,
+    public AuthService(DataRepository dataRepository,
                        PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.walletRepository = walletRepository;
+        this.dataRepository = dataRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
-    public Map<String, Object> register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
+    public Map<String, Object> register(Map<String, String> request) {
+        String username = request.get("username");
+        String email = request.get("email");
+        String password = request.get("password");
+        String roleStr = request.get("role");
+        String masterKey = request.get("masterSecretKey");
+
+        if (dataRepository.findUserByUsername(username).isPresent()) {
             throw new IllegalArgumentException("Username already exists");
         }
 
         Role role = Role.USER;
-        if ("ADMIN".equalsIgnoreCase(request.getRole())) {
-            if (request.getMasterSecretKey() == null ||
-                    !request.getMasterSecretKey().equals(masterSecretKey)) {
+        if ("ADMIN".equalsIgnoreCase(roleStr)) {
+            if (masterKey == null || !masterKey.equals(masterSecretKey)) {
                 throw new IllegalArgumentException("Invalid master secret key for admin registration");
             }
             role = Role.ADMIN;
         }
 
         User user = new User(
-                request.getUsername(),
-                request.getEmail(),
-                passwordEncoder.encode(request.getPassword()),
+                username,
+                email,
+                passwordEncoder.encode(password),
                 role
         );
 
-        userRepository.save(user);
+        dataRepository.saveUser(user);
 
         Wallet wallet = new Wallet(user.getId());
-        walletRepository.save(wallet);
+        dataRepository.saveWallet(wallet);
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "User registered successfully");
@@ -77,14 +76,17 @@ public class AuthService {
         return response;
     }
 
-    public Map<String, Object> login(LoginRequest request, HttpServletRequest httpRequest) {
-        Optional<User> userOpt = userRepository.findByUsername(request.getUsername());
+    public Map<String, Object> login(Map<String, String> request, HttpServletRequest httpRequest) {
+        String username = request.get("username");
+        String password = request.get("password");
+
+        Optional<User> userOpt = dataRepository.findUserByUsername(username);
         if (userOpt.isEmpty()) {
             throw new IllegalArgumentException("Invalid username or password");
         }
 
         User user = userOpt.get();
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new IllegalArgumentException("Invalid username or password");
         }
 
@@ -103,7 +105,7 @@ public class AuthService {
                 );
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        Optional<Wallet> walletOpt = walletRepository.findByUserId(user.getId());
+        Optional<Wallet> walletOpt = dataRepository.findWalletByUserId(user.getId());
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Login successful");
