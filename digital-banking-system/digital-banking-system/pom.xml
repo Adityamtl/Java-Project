@@ -12,19 +12,26 @@
 	<artifactId>digital-banking-system</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>digital-banking-system</name>
-	<description>Demo project for Spring Boot</description>
-	<url/>
+	<description>A RESTful digital banking system with secure authentication, wallet management, and transaction processing. Built with Spring Boot and JSON file-based storage.</description>
+	<url>https://github.com/Adityamtl/Java-Project</url>
 	<licenses>
-		<license/>
+		<license>
+			<name>MIT License</name>
+			<url>https://opensource.org/licenses/MIT</url>
+			<distribution>repo</distribution>
+		</license>
 	</licenses>
 	<developers>
-		<developer/>
+		<developer>
+			<name>Aditya Mittal</name>
+			<url>https://github.com/Adityamtl</url>
+		</developer>
 	</developers>
 	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
+		<connection>scm:git:git://github.com/Adityamtl/Java-Project.git</connection>
+		<developerConnection>scm:git:ssh://github.com/Adityamtl/Java-Project.git</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/Adityamtl/Java-Project</url>
 	</scm>
 	<properties>
 		<java.version>21</java.version>
@@ -40,7 +47,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webmvc</artifactId>
+			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
 		<dependency>
@@ -49,11 +56,7 @@
 			<scope>runtime</scope>
 			<optional>true</optional>
 		</dependency>
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<optional>true</optional>
-		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-test</artifactId>
@@ -78,28 +81,8 @@
 	<build>
 		<plugins>
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<annotationProcessorPaths>
-						<path>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</path>
-					</annotationProcessorPaths>
-				</configuration>
-			</plugin>
-			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
-				</configuration>
 			</plugin>
 		</plugins>
 	</build>

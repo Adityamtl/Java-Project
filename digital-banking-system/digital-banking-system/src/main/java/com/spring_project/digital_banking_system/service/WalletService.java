@@ -9,6 +9,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Service layer for wallet operations including deposits, withdrawals, transfers,
+ * and transaction history management.
+ *
+ * <p>Also handles admin-specific operations such as viewing all users/transactions
+ * and performing bank-initiated transfers.</p>
+ */
 @Service
 public class WalletService {
 
@@ -18,6 +25,13 @@ public class WalletService {
         this.dataRepository = dataRepository;
     }
 
+    /**
+     * Retrieves the current balance and wallet code for a user's wallet.
+     *
+     * @param userId the ID of the wallet owner
+     * @return a map containing {@code walletCode} and {@code balance}
+     * @throws RuntimeException if no wallet is found for the user
+     */
     public Map<String, Object> getBalance(Long userId) {
         Wallet wallet = dataRepository.findWalletByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Wallet not found for user"));
@@ -28,13 +42,21 @@ public class WalletService {
         return response;
     }
 
+    /**
+     * Deposits funds into the authenticated user's wallet.
+     *
+     * @param userId the ID of the wallet owner
+     * @param request a map containing the {@code amount} to deposit (must be greater than zero)
+     * @return a map containing success message, new balance, and transaction ID
+     * @throws IllegalArgumentException if the amount is null, zero, or negative
+     * @throws RuntimeException if no wallet is found for the user
+     */
     public Map<String, Object> deposit(Long userId, Map<String, Object> request) {
         Wallet wallet = dataRepository.findWalletByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Wallet not found for user"));
 
-        BigDecimal amount = new BigDecimal(request.get("amount").toString());
+        BigDecimal amount = parseAndValidateAmount(request.get("amount"));
 
-        // Add amount to current balance
         BigDecimal newBalance = wallet.getBalance().add(amount);
         wallet.setBalance(newBalance);
         dataRepository.saveWallet(wallet);
@@ -55,11 +77,20 @@ public class WalletService {
         return response;
     }
 
+    /**
+     * Withdraws funds from the authenticated user's wallet.
+     *
+     * @param userId the ID of the wallet owner
+     * @param request a map containing the {@code amount} to withdraw (must be greater than zero)
+     * @return a map containing success message, new balance, and transaction ID
+     * @throws IllegalArgumentException if the amount is null, zero, or negative
+     * @throws RuntimeException if no wallet is found or if the balance is insufficient
+     */
     public Map<String, Object> withdraw(Long userId, Map<String, Object> request) {
         Wallet wallet = dataRepository.findWalletByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Wallet not found for user"));
 
-        BigDecimal amount = new BigDecimal(request.get("amount").toString());
+        BigDecimal amount = parseAndValidateAmount(request.get("amount"));
 
         if (wallet.getBalance().compareTo(amount) < 0) {
             Transaction failedTransaction = new Transaction(
@@ -93,6 +124,15 @@ public class WalletService {
         return response;
     }
 
+    /**
+     * Transfers funds from the authenticated user's wallet to another wallet.
+     *
+     * @param userId the ID of the sender
+     * @param request a map containing {@code targetWalletCode} and {@code amount}
+     * @return a map containing success message, new balance, transaction ID, and recipient wallet code
+     * @throws IllegalArgumentException if the amount is invalid or the user tries to transfer to their own wallet
+     * @throws RuntimeException if either wallet is not found or if the balance is insufficient
+     */
     public Map<String, Object> transfer(Long userId, Map<String, Object> request) {
         Wallet senderWallet = dataRepository.findWalletByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Sender wallet not found"));
@@ -105,7 +145,7 @@ public class WalletService {
             throw new IllegalArgumentException("Cannot transfer to your own wallet");
         }
 
-        BigDecimal amount = new BigDecimal(request.get("amount").toString());
+        BigDecimal amount = parseAndValidateAmount(request.get("amount"));
 
         if (senderWallet.getBalance().compareTo(amount) < 0) {
             Transaction failedTransaction = new Transaction(
@@ -145,6 +185,13 @@ public class WalletService {
         return response;
     }
 
+    /**
+     * Retrieves the transaction history for a user's wallet, ordered by timestamp descending.
+     *
+     * @param userId the ID of the wallet owner
+     * @return a list of transactions involving the user's wallet
+     * @throws RuntimeException if no wallet is found for the user
+     */
     public List<Transaction> getHistory(Long userId) {
         Wallet wallet = dataRepository.findWalletByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Wallet not found for user"));
@@ -152,18 +199,38 @@ public class WalletService {
         return dataRepository.findTransactionsByWalletId(wallet.getId());
     }
 
-    // Admin operations (merged from AdminService)
+    // ==================== ADMIN OPERATIONS ====================
+
+    /**
+     * Retrieves all transactions in the system. Requires ADMIN role.
+     *
+     * @return a list of all transactions
+     */
     public List<Transaction> getAllTransactions() {
         return dataRepository.findAllTransactions();
     }
 
+    /**
+     * Retrieves all registered users. Requires ADMIN role.
+     *
+     * @return a list of all users
+     */
     public List<User> getAllUsers() {
         return dataRepository.findAllUsers();
     }
 
+    /**
+     * Performs a bank-initiated transfer to a target wallet. Requires ADMIN role.
+     * This operation adds funds without deducting from any user's wallet.
+     *
+     * @param request a map containing {@code targetWalletCode} and {@code amount}
+     * @return a map containing success message, target wallet code, amount, new balance, and transaction ID
+     * @throws IllegalArgumentException if the amount is invalid
+     * @throws RuntimeException if the target wallet is not found
+     */
     public Map<String, Object> bankTransfer(Map<String, Object> request) {
         String targetWalletCode = request.get("targetWalletCode").toString();
-        BigDecimal amount = new BigDecimal(request.get("amount").toString());
+        BigDecimal amount = parseAndValidateAmount(request.get("amount"));
 
         Wallet targetWallet = dataRepository.findWalletByWalletCode(targetWalletCode)
                 .orElseThrow(() -> new RuntimeException("Target wallet not found"));
@@ -188,5 +255,33 @@ public class WalletService {
         response.put("newBalance", newBalance);
         response.put("transactionId", transaction.getId());
         return response;
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Parses and validates a monetary amount from the request payload.
+     *
+     * @param amountObj the raw amount value from the request
+     * @return the validated {@link BigDecimal} amount
+     * @throws IllegalArgumentException if the amount is null, zero, or negative
+     */
+    private BigDecimal parseAndValidateAmount(Object amountObj) {
+        if (amountObj == null) {
+            throw new IllegalArgumentException("Amount is required");
+        }
+
+        BigDecimal amount;
+        try {
+            amount = new BigDecimal(amountObj.toString());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid amount format: " + amountObj);
+        }
+
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero");
+        }
+
+        return amount;
     }
 }

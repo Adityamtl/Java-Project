@@ -19,8 +19,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Authentication service - Handles user registration, login, and logout
- * Uses simple session management for authentication
+ * Authentication service handling user registration, login, and logout.
+ *
+ * <p>Uses HTTP session-based authentication with Spring Security integration.
+ * Supports role-based access control with USER and ADMIN roles. Admin registration
+ * requires a master secret key for verification.</p>
  */
 @Service
 public class AuthService {
@@ -28,7 +31,7 @@ public class AuthService {
     private final DataRepository dataRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${app.admin.master-key:BANK_ADMIN_2025}")
+    @Value("${app.admin.master-key:CHANGE_ME_IN_PRODUCTION}")
     private String masterSecretKey;
 
     public AuthService(DataRepository dataRepository,
@@ -37,12 +40,34 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Registers a new user and creates an associated wallet.
+     *
+     * <p>If the role is set to "ADMIN", the request must include a valid
+     * {@code masterSecretKey} matching the configured admin key.</p>
+     *
+     * @param request a map containing {@code username}, {@code email}, {@code password},
+     *                and optionally {@code role} and {@code masterSecretKey}
+     * @return a map with registration confirmation, username, role, and wallet code
+     * @throws IllegalArgumentException if required fields are missing, username exists,
+     *                                  or admin key is invalid
+     */
     public Map<String, Object> register(Map<String, String> request) {
         String username = request.get("username");
         String email = request.get("email");
         String password = request.get("password");
         String roleStr = request.get("role");
         String masterKey = request.get("masterSecretKey");
+
+        if (username == null || username.isBlank()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email is required");
+        }
+        if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("Password is required");
+        }
 
         if (dataRepository.findUserByUsername(username).isPresent()) {
             throw new IllegalArgumentException("Username already exists");
@@ -76,6 +101,14 @@ public class AuthService {
         return response;
     }
 
+    /**
+     * Authenticates a user and creates an HTTP session with their credentials.
+     *
+     * @param request     a map containing {@code username} and {@code password}
+     * @param httpRequest the HTTP request used to create a session
+     * @return a map with login confirmation, username, role, session ID, and wallet code
+     * @throws IllegalArgumentException if the credentials are invalid
+     */
     public Map<String, Object> login(Map<String, String> request, HttpServletRequest httpRequest) {
         String username = request.get("username");
         String password = request.get("password");
@@ -118,6 +151,12 @@ public class AuthService {
         return response;
     }
 
+    /**
+     * Logs out the current user by invalidating their session and clearing the security context.
+     *
+     * @param request the HTTP request containing the session to invalidate
+     * @return a map with a logout confirmation message
+     */
     public Map<String, Object> logout(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
@@ -130,6 +169,13 @@ public class AuthService {
         return response;
     }
 
+    /**
+     * Retrieves the currently authenticated user's ID from the HTTP session.
+     *
+     * @param request the HTTP request containing the active session
+     * @return the current user's ID
+     * @throws IllegalStateException if no active session or user ID is found
+     */
     public Long getCurrentUserId(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
